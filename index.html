@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avaliação de Desempenho - Fornecedores Críticos (WYDA)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Biblioteca SheetJS para leitura direta de ficheiros Excel (.xlsx, .xls) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            orange: '#F58220',
+                            blue: '#19305A',
+                            light: '#F8FAFC',
+                            border: '#E2E8F0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8F9FA; }
+        .table-container::-webkit-scrollbar { height: 8px; width: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .badge { display: inline-flex; align-items: center; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .badge-aprovado { background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .badge-restricao { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+        .badge-reprovado { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .row-reprovado { border-left: 4px solid #ef4444; background-color: #fef2f2 !important; }
+        .row-normal { border-left: 4px solid transparent; }
+    </style>
+</head>
+<body class="text-gray-800 p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between mb-8 pb-4 border-b border-gray-200 gap-4">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center">
+                <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="50" fill="#19305A"/>
+                    <path d="M30 70L40 40L50 60L60 30L70 70" stroke="#F58220" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="ml-3">
+                    <h1 class="text-brand-blue font-bold text-xl leading-tight">WYDA</h1>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Embalagens</span>
+                </div>
+            </div>
+            <div class="hidden md:block h-10 w-px bg-gray-300 mx-2"></div>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800">Avaliação de Desempenho</h2>
+                <p class="text-xs text-gray-500">Fornecedores Críticos</p>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+            <nav class="flex gap-1 bg-white p-1 rounded-full shadow-sm border border-gray-200 overflow-x-auto w-full md:w-auto">
+                <button class="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-full transition-colors whitespace-nowrap">Homologação</button>
+                <button class="px-4 py-1.5 text-sm font-medium bg-brand-orange text-white rounded-full shadow-sm transition-colors whitespace-nowrap">Avaliações</button>
+                <button class="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-full transition-colors whitespace-nowrap">Fornecedor</button>
+            </nav>
+
+            <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2 bg-brand-orange text-white px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors shadow-sm cursor-pointer" title="Selecione o ficheiro Excel (.xlsx) da planilha">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Carregar Excel</span>
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelFile(event)">
+                </label>
+
+                <button onclick="exportToCSV()" class="flex items-center gap-2 bg-brand-blue text-white px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-blue-900 transition-colors shadow-sm" title="Exportar dados filtrados">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden sm:inline">Exportar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content Card -->
+    <main class="max-w-7xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+            <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 uppercase tracking-wide">Descrição das Avaliações</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <span id="total-count" class="font-medium text-gray-700">0</span> fornecedores carregados · 
+                        Pesos: <span class="font-medium">BPF</span> 30% · Sistema 50% · Social 20%
+                    </p>
+                </div>
+                <div id="file-info" class="text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md border border-blue-100">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Pronto. A carregar dados...
+                </div>
+            </div>
+
+            <div class="mt-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div class="relative w-full sm:w-80">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar fornecedor..." class="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange transition-shadow shadow-sm">
+                </div>
+                
+                <div class="flex gap-2 overflow-x-auto w-full pb-1 sm:pb-0" id="filter-buttons">
+                    <button class="filter-btn active px-3 py-1.5 text-xs font-medium rounded-md bg-gray-800 text-white transition-colors whitespace-nowrap" data-filter="all">Todos</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap" data-filter="Aprovado">Aprovados</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap" data-filter="Aprovado com Restrição">Com Restrição</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap" data-filter="Reprovado">Reprovados</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto table-container max-h-[600px] relative">
+            <table class="w-full text-left text-sm text-gray-600 min-w-[800px] relative">
+                <thead class="text-xs text-gray-500 uppercase bg-gray-50/95 backdrop-blur sticky top-0 z-10 shadow-sm">
+                    <tr>
+                        <th scope="col" class="px-6 py-4 font-semibold w-1/4">Fornecedor</th>
+                        <th scope="col" class="px-4 py-4 font-semibold text-center" title="Peso: 30%">BPF (30%)</th>
+                        <th scope="col" class="px-4 py-4 font-semibold text-center" title="Peso: 50%">Sistema (50%)</th>
+                        <th scope="col" class="px-4 py-4 font-semibold text-center" title="Peso: 20%">Social (20%)</th>
+                        <th scope="col" class="px-4 py-4 font-semibold text-center">Total</th>
+                        <th scope="col" class="px-6 py-4 font-semibold">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="divide-y divide-gray-100 bg-white"></tbody>
+            </table>
+            
+            <div id="empty-state" class="hidden flex-col items-center justify-center py-16 text-gray-500 bg-white">
+                <i class="fa-solid fa-folder-open text-4xl mb-3 text-gray-300"></i>
+                <p class="text-sm font-medium">Nenhum registo encontrado.</p>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                Mostrando <span class="font-medium text-gray-900" id="page-start">0</span> a <span class="font-medium text-gray-900" id="page-end">0</span> de <span class="font-medium text-gray-900" id="page-total">0</span> resultados
+            </div>
+            <div class="flex gap-1" id="pagination-controls"></div>
+        </div>
+    </main>
+
+    <script>
+        const maxScores = { bpf: 30, sistema: 50, social: 20 };
+        
+        let rawData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const itemsPerPage = 5;
+        let currentFilter = 'all';
+        let searchQuery = '';
+
+        const tableBody = document.getElementById('table-body');
+        const emptyState = document.getElementById('empty-state');
+        const searchInput = document.getElementById('searchInput');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const totalCountEl = document.getElementById('total-count');
+        const pageStartEl = document.getElementById('page-start');
+        const pageEndEl = document.getElementById('page-end');
+        const pageTotalEl = document.getElementById('page-total');
+        const paginationControls = document.getElementById('pagination-controls');
+        const fileInfoEl = document.getElementById('file-info');
+
+        function getPercentage(score, max) { return Math.min(100, Math.max(0, (score / max) * 100)); }
+        
+        function getBadgeClass(status) {
+            if (!status) return 'badge-restricao';
+            if (status.includes('Aprovado') && !status.includes('Restrição')) return 'badge-aprovado';
+            if (status.includes('Reprovado')) return 'badge-reprovado';
+            return 'badge-restricao';
+        }
+
+        function getProgressColorClass(pct) {
+            if (pct >= 80) return 'bg-blue-400';
+            if (pct >= 50) return 'bg-orange-300';
+            return 'bg-red-400';
+        }
+
+        function renderTable() {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedData = filteredData.slice(startIndex, endIndex);
+
+            tableBody.innerHTML = '';
+            
+            if (paginatedData.length === 0) {
+                emptyState.style.display = 'flex';
+            } else {
+                emptyState.style.display = 'none';
+                paginatedData.forEach((row, index) => {
+                    const isReprovado = row.status && row.status.includes('Reprovado');
+                    const rowClass = isReprovado ? 'row-reprovado hover:bg-red-50' : 'row-normal hover:bg-gray-50/50';
+                    const bgClass = index % 2 === 0 && !isReprovado ? 'bg-white' : (isReprovado ? '' : 'bg-gray-50/35');
+
+                    const tr = document.createElement('tr');
+                    tr.className = `${rowClass} ${bgClass} transition-colors`;
+                    
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-gray-900">${row.name}</td>
+                        <td class="px-4 py-4 text-center">
+                            <div class="text-sm font-medium text-gray-700">${row.bpf.toFixed(2)}</div>
+                            <div class="w-[70%] mx-auto bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+                                <div class="${getProgressColorClass(getPercentage(row.bpf, maxScores.bpf))} h-1 rounded-full" style="width: ${getPercentage(row.bpf, maxScores.bpf)}%"></div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <div class="text-sm font-medium text-gray-700">${row.sistema.toFixed(2)}</div>
+                            <div class="w-[70%] mx-auto bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+                                <div class="${getProgressColorClass(getPercentage(row.sistema, maxScores.sistema))} h-1 rounded-full" style="width: ${getPercentage(row.sistema, maxScores.sistema)}%"></div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <div class="text-sm font-medium text-gray-700">${row.social.toFixed(2)}</div>
+                            <div class="w-[70%] mx-auto bg-gray-200 rounded-full h-1 mt-1.5 overflow-hidden">
+                                <div class="${getProgressColorClass(getPercentage(row.social, maxScores.social))} h-1 rounded-full" style="width: ${getPercentage(row.social, maxScores.social)}%"></div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <span class="font-bold text-gray-900">${row.total.toFixed(2)}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="badge ${getBadgeClass(row.status)}">${row.status}</span>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+            updatePaginationInfo();
+        }
+
+        function updatePaginationInfo() {
+            const totalItems = filteredData.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+            
+            pageStartEl.textContent = totalItems === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1;
+            pageEndEl.textContent = Math.min(currentPage * itemsPerPage, totalItems);
+            pageTotalEl.textContent = totalItems;
+            totalCountEl.textContent = totalItems;
+
+            let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="px-3 py-1.5 border rounded-md bg-white text-gray-600 disabled:opacity-50 text-sm">Anterior</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    const active = i === currentPage ? 'bg-brand-blue text-white border-brand-blue' : 'bg-white text-gray-600 border-gray-200';
+                    html += `<button onclick="changePage(${i})" class="w-8 h-8 flex items-center justify-center border rounded-md ${active} text-sm">${i}</button>`;
+                }
+            }
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="px-3 py-1.5 border rounded-md bg-white text-gray-600 disabled:opacity-50 text-sm">Próxima</button>`;
+            paginationControls.innerHTML = html;
+        }
+
+        window.changePage = function(page) {
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (page >= 1 && page <= totalPages) { currentPage = page; renderTable(); }
+        }
+
+        function applyFilters() {
+            filteredData = rawData.filter(row => {
+                const matchesSearch = row.name.toLowerCase().includes(searchQuery.toLowerCase()) || (row.status && row.status.toLowerCase().includes(searchQuery.toLowerCase()));
+                const matchesStatus = currentFilter === 'all' || row.status === currentFilter;
+                return matchesSearch && matchesStatus;
+            });
+            currentPage = 1;
+            renderTable();
+        }
+
+        searchInput.addEventListener('input', (e) => { searchQuery = e.target.value; applyFilters(); });
+
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                filterButtons.forEach(b => { b.classList.remove('bg-gray-800', 'text-white'); b.classList.add('bg-white', 'text-gray-600'); });
+                e.target.classList.remove('bg-white', 'text-gray-600');
+                e.target.classList.add('bg-gray-800', 'text-white');
+                currentFilter = e.target.getAttribute('data-filter');
+                applyFilters();
+            });
+        });
+
+        // LEITOR DE EXCEL MANUAL (Caso abra fora do SharePoint)
+        function handleExcelFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    parseExcelRows(rows, file.name);
+                } catch (error) {
+                    console.error(error);
+                    alert("Erro ao ler o ficheiro Excel.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseExcelRows(rows, fileName) {
+            if (!rows || rows.length === 0) {
+                alert("O ficheiro Excel está vazio.");
+                return;
+            }
+
+            const keys = Object.keys(rows[0]);
+
+            const findKeyByKeywords = (keywords) => {
+                for (let i = keys.length - 1; i >= 0; i--) {
+                    const k = keys[i].toUpperCase().trim();
+                    for (let kw of keywords) {
+                        if (k === kw || k.includes(kw)) {
+                            return keys[i];
+                        }
+                    }
+                }
+                return null;
+            };
+
+            const nameKey = keys.find(k => k.toUpperCase().includes('FORNECEDOR'));
+            const bpfKey = findKeyByKeywords(['BPF']);
+            const sistemaKey = findKeyByKeywords(['SISTEMA', 'SISTEMAS', 'SIST', 'SGQ']);
+            const socialKey = findKeyByKeywords(['SOCIAL']);
+            const totalKey = findKeyByKeywords(['TOTAL', 'TOTALNOTA', 'NOTA TOTAL']);
+            const statusKey = findKeyByKeywords(['STATUS', 'STATUSFINAL', 'PARECER']);
+
+            const newRawData = [];
+
+            rows.forEach(row => {
+                if (nameKey && row[nameKey]) {
+                    const cleanNum = (val) => {
+                        if (val === undefined || val === null) return 0;
+                        if (typeof val === 'number') return val;
+                        return parseFloat(String(val).replace(',', '.')) || 0;
+                    };
+
+                    newRawData.push({
+                        name: String(row[nameKey]).trim(),
+                        bpf: bpfKey ? cleanNum(row[bpfKey]) : 0,
+                        sistema: sistemaKey ? cleanNum(row[sistemaKey]) : 0,
+                        social: socialKey ? cleanNum(row[socialKey]) : 0,
+                        total: totalKey ? cleanNum(row[totalKey]) : 0,
+                        status: statusKey ? String(row[statusKey]).trim() : 'Aprovado'
+                    });
+                }
+            });
+
+            if (newRawData.length > 0) {
+                rawData = newRawData;
+                filteredData = [...rawData];
+                fileInfoEl.innerHTML = `<i class="fa-solid fa-circle-check text-green-600 mr-1"></i> Ficheiro "${fileName}" carregado com sucesso (${rawData.length} fornecedores).`;
+                fileInfoEl.className = "text-xs text-green-700 bg-green-50 px-3 py-1.5 rounded-md border border-green-200";
+                renderTable();
+            } else {
+                alert("Não foi possível detetar as colunas automaticamente.");
+            }
+        }
+
+        // INTEGRAÇÃO AUTOMÁTICA COM O SHAREPOINT VIA API REST
+        async function carregarDadosSharePoint() {
+            try {
+                // Altere 'AvaliacaoFornecedores' para o nome exato da sua Lista no SharePoint
+                const url = `${_spPageContextInfo.webAbsoluteUrl}/_api/web/lists/getbytitle('AvaliacaoFornecedores')/items`;
+                
+                const resposta = await fetch(url, {
+                    headers: { "Accept": "application/json;odata=verbose" }
+                });
+                
+                const resultado = await resposta.json();
+                
+                rawData = resultado.d.results.map(item => ({
+                    name: item.Title,
+                    bpf: parseFloat(item.BPF) || 0,
+                    sistema: parseFloat(item.Sistema) || 0,
+                    social: parseFloat(item.Social) || 0,
+                    total: parseFloat(item.Total) || 0,
+                    status: item.Status || 'Aprovado'
+                }));
+                
+                filteredData = [...rawData];
+                fileInfoEl.innerHTML = `<i class="fa-solid fa-circle-check text-green-600 mr-1"></i> Dados sincronizados do SharePoint (${rawData.length} fornecedores).`;
+                fileInfoEl.className = "text-xs text-green-700 bg-green-50 px-3 py-1.5 rounded-md border border-green-200";
+                renderTable();
+            } catch (erro) {
+                console.error("Erro ao ligar ao SharePoint:", erro);
+                fileInfoEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> Erro ao carregar do SharePoint. Use o botão Excel.`;
+                fileInfoEl.className = "text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200";
+            }
+        }
+
+        window.exportToCSV = function() {
+            if (filteredData.length === 0) return;
+            const headers = ["Fornecedor", "BPF", "Sistema", "Social", "Total", "Status"];
+            const csvRows = [headers.join(";")];
+            filteredData.forEach(row => {
+                csvRows.push([`"${row.name}"`, row.bpf, row.sistema, row.social, row.total, `"${row.status}"`].join(";"));
+            });
+            const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `Avaliacao_Fornecedores_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // INICIALIZAÇÃO INTELIGENTE
+        if (typeof _spPageContextInfo !== 'undefined') {
+            // Se estiver dentro de uma página do SharePoint, busca direto da Lista
+            carregarDadosSharePoint();
+        } else {
+            // Caso contrário, exibe mensagem para carregar o Excel
+            fileInfoEl.innerHTML = `<i class="fa-solid fa-circle-info mr-1"></i> Modo local. Carregue o seu ficheiro Excel (.xlsx) para visualizar os dados.`;
+            renderTable();
+        }
+    </script>
+</body>
+</html>
